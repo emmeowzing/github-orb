@@ -89,7 +89,7 @@ jobs:
       - checkout
       - add_ssh_keys:
           fingerprints:
-            - FIXME
+            - "8a:59:7b:8c:a9:a8:f6:8b:98:7c:6d:c4:30:2a:38:ea"
       - increment-minor-tag
 
   generate-release:
