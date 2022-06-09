@@ -1,7 +1,6 @@
-`example` orb for CircleCI
---------------------------
+## GitHub orb for CircleCI
 
-This orb provides a set of commands and jobs for [`example`](https://example.com) in CircleCI workflows. Commands include 
+This orb provides helper commands and jobs for performing common GitHub tasks.
 
 ### Development
 

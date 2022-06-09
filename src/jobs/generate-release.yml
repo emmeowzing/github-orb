@@ -1,0 +1,40 @@
+description: |+
+  Generate a GitHub release from the latest tag on a repository. Requires a GITHUB_TOKEN environment variable be set.
+executor: default
+resource_class: small
+parameters:
+  tag:
+    description: The tag from which to generate a release. Defaults to latest.
+    default: latest
+    type: string
+steps:
+  - checkout
+  - install-gh-cli
+  - when:
+      condition:
+        equal:
+          - << parameters.tag >>
+          - latest
+      steps:
+        - run:
+            name: Generate release
+            command: |+
+              # Get latest tag.
+              git fetch --all --tags
+              export LATEST_TAG="$(git tag | sort -V | tail -1)"
+              echo "$LATEST_TAG"
+
+              # Generate release from tag.
+              echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null || true
+              gh release create "$LATEST_TAG" --generate-notes
+  - unless:
+      condition:
+        equal:
+          - << parameters.tag >>
+          - latest
+      steps:
+        - run:
+            name: Generate release from tag << parameters.tag >>
+            command: |+
+              echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null || true
+              gh release create << parameters.tag >> --generate-notes
