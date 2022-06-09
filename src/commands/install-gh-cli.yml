@@ -1,0 +1,12 @@
+description: Install the GitHub gh CLI tool.
+parameters:
+  version:
+    type: string
+    default: "2.12.1"
+    description: Version of the CLI to install.
+steps:
+  - run:
+      name: Install gh CLI
+      command: |+
+        wget https://github.com/cli/cli/releases/download/v<< parameters.version >>/gh_<< parameters.version >>_linux_amd64.deb -O gh.deb
+        sudo dpkg -i gh.deb

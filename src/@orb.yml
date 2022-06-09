@@ -1,11 +1,11 @@
 version: 2.1
 
 description: |
-  An example orb repository template.
+  Helpful GitHub functions, based on git and the gh CLI.
 
 # This information will be displayed in the orb registry and is not mandatory.
 display:
-  home_url: "https://github.com/bjd2385/circleci-orb-template"
-  source_url: "https://github.com/bjd2385/circleci-orb-template"
+  home_url: "https://circleci.com/developer/orbs/orb/bjd2385/github"
+  source_url: "https://github.com/bjd2385/github-orb"
 
 orbs: {}
