@@ -1,0 +1,230 @@
+version: 2.1
+
+parameters:
+  workspace:
+    type: string
+    default: bjd2385
+
+  orb-name:
+    type: string
+    default: circleci-orb-template
+
+orbs:
+  orb-tools: circleci/orb-tools@11.1.2
+  shellcheck: circleci/shellcheck@3.1.1
+  circleci-cli: circleci/circleci-cli@0.1.9
+
+executors:
+  default:
+    docker:
+      - image: cimg/base:stable
+
+commands:
+  check_version:
+    steps:
+      - run:
+          name: Install / upgrade the CircleCI CLI
+          command: curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | sudo bash
+      - run:
+          name: Assert tag version is unpublished
+          command: |
+            [[ "$(circleci orb list << pipeline.parameters.workspace >> | grep "<< pipeline.parameters.workspace >>/<< pipeline.parameters.orb-name >>" | grep -oE "[0-9].[0-9].[0-9]")" != "${CIRCLE_TAG}" ]]
+
+  increment-minor-tag:
+    steps:
+      - run:
+          name: Autoincrement repository's latest tag minor version
+          command: |+
+            git fetch --all --tags
+            RES="$(git show-ref --tags)"
+
+            if [ -z "$RES" ]; then
+                NEW_TAG="v1.0.0"
+            else
+                mapfile -d " " -t LATEST_TAG < <(git tag | sort -V | tail -1 | sed 's/\./ /g')
+
+                if [ "${#LATEST_TAG[@]}" -ne 3 ]; then
+                    printf "Must follow semver convention /v?[0-9]{3}.[0-9]{3}.[0-9]{3}/ to parse.\\n" 1>&2
+                    exit 1
+                fi
+
+                one="${LATEST_TAG[0]//v/}"
+                two="${LATEST_TAG[1]}"
+                three="${LATEST_TAG[2]}"
+
+                # Increment versions mod 1k.
+                if [ "$three" == "999" ]; then
+                    if [ "$two" == "999" ]; then
+                        three=0
+                        two=0
+                        ((one++))
+                    else
+                        ((two++))
+                        three=0
+                    fi
+                elif [ "$two" == "999" ] && [ "$three" == "999" ]; then
+                    ((one++))
+                    two=0
+                else
+                    ((three++))
+                fi
+
+                NEW_TAG="v${one}.${two}.${three}"
+            fi
+
+            git tag "$NEW_TAG"
+            git push origin "$NEW_TAG"
+
+jobs:
+  check_version:
+    executor: default
+    resource_class: small
+    steps:
+      - check_version
+
+  autoincrement-minor-tag:
+    executor: default
+    resource_class: small
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints:
+            - FIXME
+      - increment-minor-tag
+
+  generate-release:
+    executor: default
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Install gh CLI
+          command: |+
+            wget https://github.com/cli/cli/releases/download/v2.9.0/gh_2.9.0_linux_amd64.deb -O gh.deb
+            sudo dpkg -i gh.deb
+      - run:
+          name: Generate release
+          command: |+
+            # Get latest tag.
+            git fetch --all --tags
+            export LATEST_TAG="$(git tag | sort -V | tail -1)"
+            echo "$LATEST_TAG"
+
+            # Generate release from tag.
+            echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null || true
+            gh release create "$LATEST_TAG" --generate-notes
+
+  pack-orb:
+    # A rewrite of CircleCI's pack step with prepacking - https://github.com/CircleCI-Public/orb-tools-orb/blob/532a5e8fba31e293978ea90a0a97b28f96f2e689/src/jobs/pack.yml#L23
+    executor: default
+    resource_class: small
+    parameters:
+      source-dir:
+        description: Directory unpacked orb source resides in.
+        type: string
+        default: ./src
+      output-dir:
+        description: The orb output directory. The orb will be named "orb.yml" in this directory and persisted to the workspace.
+        type: string
+        default: ./dist
+    steps:
+      - checkout
+      - circleci-cli/install
+      - run:
+          name: Pack orb
+          command: |
+            find << parameters.source-dir >> -maxdepth 1 -mindepth 1 -type d | xargs -I % basename % | xargs -I % ./scripts/pre-pack.sh << parameters.source-dir >> %
+            mkdir -p << parameters.output-dir >>
+            circleci orb pack --skip-update-check << parameters.source-dir >> > << parameters.output-dir >>/orb.yml
+      - persist_to_workspace:
+          paths:
+            - orb.yml
+          root: << parameters.output-dir >>
+
+workflows:
+  on-tag:
+    jobs:
+      - check_version:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+$/
+
+      - pack-orb:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+$/
+
+      - orb-tools/publish:
+          name: publish production orb
+          enable-pr-comment: false
+          vcs-type: << pipeline.project.type >>
+          orb-name: << pipeline.parameters.workspace >>/<< pipeline.parameters.orb-name >>
+          pub-type: production
+          requires:
+            - pack-orb
+            - check_version
+          context:
+            - development
+            - orb-publishing
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+$/
+
+  on-merge:
+    jobs:
+      # Auto-increment minor tag to kick off on-tag workflow.
+      - autoincrement-minor-tag:
+          filters:
+            branches:
+              only: master
+
+      # Generate a release from the latest tag.
+      - generate-release:
+          context: github
+          filters:
+            branches:
+              only: master
+          requires:
+            - autoincrement-minor-tag
+
+  on-commit:
+    jobs:
+      # Run a bunch of tests against this repo
+      - orb-tools/lint:
+          filters:
+            branches:
+              ignore: master
+
+      - pack-orb:
+          filters:
+            branches:
+              ignore: master
+
+      - shellcheck/check:
+          exclude: SC2148
+          filters:
+            branches:
+              ignore: master
+
+      - orb-tools/publish:
+          name: publish development orb
+          enable-pr-comment: true
+          vcs-type: << pipeline.project.type >>
+          orb-name: << pipeline.parameters.workspace >>/<< pipeline.parameters.orb-name >>
+          pub-type: dev
+          requires:
+            - pack-orb
+            - orb-tools/lint
+            - shellcheck/check
+          context:
+            - orb-publishing
+            - github
+          filters:
+            branches:
+              ignore: master
