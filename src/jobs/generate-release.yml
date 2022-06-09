@@ -1,4 +1,5 @@
-description: Generate a GitHub release from the latest tag on a repository.
+description: |+
+  Generate a GitHub release from the latest tag on a repository. Requires a GITHUB_TOKEN environment variable be set.
 executor: default
 resource_class: small
 parameters:
