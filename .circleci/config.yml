@@ -7,7 +7,7 @@ parameters:
 
   orb-name:
     type: string
-    default: github-orb
+    default: github
 
 orbs:
   orb-tools: circleci/orb-tools@11.1.2
