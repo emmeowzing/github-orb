@@ -2,14 +2,14 @@ description: Increment a repository's tag.
 executor: default
 resource_class: small
 parameters:
-  ssh-key:
+  ssh-key-fingerprint:
     description: GitHub repository's SSH key (must be r/w).
     type: string
 steps:
   - checkout
   - add_ssh_keys:
       fingerprints:
-        - << parameters.ssh-key >>
+        - << parameters.ssh-key-fingerprint >>
   - run:
       name: Autoincrement repository's latest tag minor version
       command: << include(scripts/increment-tag.sh) >>
