@@ -10,6 +10,7 @@ parameters:
 steps:
   - checkout
   - install-gh-cli
+  # if (<< parameters.tag >> == "latest")
   - when:
       condition:
         equal:
@@ -27,6 +28,7 @@ steps:
               # Generate release from tag.
               echo "$GITHUB_TOKEN" | gh auth login --with-token 2>/dev/null || true
               gh release create "$LATEST_TAG" --generate-notes
+  # else
   - unless:
       condition:
         equal:
