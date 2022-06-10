@@ -2,7 +2,7 @@ _extends: .github
 
 repository:
   name: github-orb
-  description: GitHub helper jobs and commands.
+  description: GitHub helper jobs and commands
   homepage: https://circleci.com/developer/orbs/orb/bjd2385/github
   topics: circleci, orb, github
   private: false
