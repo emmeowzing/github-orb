@@ -75,14 +75,12 @@ workflows:
 
   on-merge:
     jobs:
-      # Auto-increment minor tag to kick off on-tag workflow.
       - github-alpha/auto-increment-tag:
           ssh-key-fingerprint: "8a:59:7b:8c:a9:a8:f6:8b:98:7c:6d:c4:30:2a:38:ea"
           filters:
             branches:
               only: master
 
-      # Generate a release from the latest tag.
       - github-alpha/generate-release:
           context: github
           filters:
@@ -93,7 +91,6 @@ workflows:
 
   on-commit:
     jobs:
-      # Run a bunch of tests against this repo
       - orb-tools/lint:
           filters:
             branches:
@@ -126,3 +123,32 @@ workflows:
           filters:
             branches:
               ignore: master
+
+  # Keep development build alive.
+  on-webhook:
+    jobs:
+      - orb-tools/pack:
+          filters:
+            branches:
+              only: master
+      - orb-tools/publish:
+          name: publish development orb
+          enable-pr-comment: true
+          vcs-type: << pipeline.project.type >>
+          orb-name: << pipeline.parameters.workspace >>/<< pipeline.parameters.orb-name >>
+          pub-type: dev
+          requires:
+            - orb-tools/pack
+          context:
+            - orb-publishing
+            - github
+          filters:
+            branches:
+              ignore: master
+    triggers:
+      - schedule:
+          cron: "0 4 1 3,6,9,12 *"
+          filters:
+            branches:
+              only:
+                - master
