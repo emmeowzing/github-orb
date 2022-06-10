@@ -20,28 +20,12 @@ executors:
     docker:
       - image: cimg/base:stable
 
-commands:
-  check_version:
-    steps:
-      - run:
-          name: Install / upgrade the CircleCI CLI
-          command: curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | sudo bash
-      - run:
-          name: Assert tag version is unpublished
-          command: |
-            [[ "$(circleci orb list << pipeline.parameters.workspace >> | grep "<< pipeline.parameters.workspace >>/<< pipeline.parameters.orb-name >>" | grep -oE "[0-9].[0-9].[0-9]")" != "${CIRCLE_TAG}" ]]
-
-jobs:
-  check_version:
-    executor: default
-    resource_class: small
-    steps:
-      - check_version
-
 workflows:
   on-tag:
     jobs:
-      - check_version:
+      - github-alpha/check-tag-version:
+          workspace: << pipeline.parameters.workspace >>
+          orb-name: << pipeline.parameters.orb-name >>
           filters:
             branches:
               ignore: /.*/
@@ -63,7 +47,7 @@ workflows:
           pub-type: production
           requires:
             - orb-tools/pack
-            - check_version
+            - github-alpha/check-tag-version
           context:
             - development
             - orb-publishing
@@ -125,7 +109,7 @@ workflows:
               ignore: master
 
   # Keep development build alive.
-  on-webhook:
+  scheduled:
     jobs:
       - orb-tools/pack:
           filters:
