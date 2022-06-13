@@ -60,7 +60,7 @@ workflows:
   on-merge:
     jobs:
       - github-alpha/auto-increment-tag:
-          ssh-key-fingerprint: "42:69:ed:28:5e:17:36:09:61:61:c3:8a:4d:5f:2f:d1"
+          ssh-key-fingerprint: 42:69:ed:28:5e:17:36:09:61:61:c3:8a:4d:5f:2f:d1
           filters:
             branches:
               only: master
